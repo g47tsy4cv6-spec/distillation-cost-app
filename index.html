@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#18392f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="蒸留原価計算" />
+  <title>蒸留・ブレンド原価計算</title>
+  <style>
+    :root{
+      --bg:#f4f6f3; --card:#ffffff; --ink:#17211d; --muted:#64726c;
+      --brand:#18392f; --brand2:#2f6b58; --line:#d9e0dc; --danger:#a63636;
+      --soft:#edf4f0; --warning:#fff7dd;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif}
+    header{position:sticky;top:0;z-index:20;background:rgba(24,57,47,.96);color:#fff;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+    header h1{font-size:18px;margin:0 0 3px}
+    header p{font-size:12px;margin:0;opacity:.8}
+    main{max-width:1100px;margin:auto;padding:14px 12px 100px}
+    section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:14px;box-shadow:0 3px 14px rgba(20,40,30,.04)}
+    h2{font-size:17px;margin:0 0 12px}
+    h3{font-size:15px;margin:8px 0}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    label{font-size:12px;color:var(--muted);display:block}
+    input,select,button{font:inherit}
+    input,select{width:100%;padding:10px;border:1px solid #cbd4cf;border-radius:10px;background:#fff;color:var(--ink)}
+    input:focus,select:focus{outline:2px solid #a8c9bb;border-color:var(--brand2)}
+    button{border:0;border-radius:10px;padding:10px 13px;font-weight:700;cursor:pointer}
+    .primary{background:var(--brand);color:#fff}
+    .secondary{background:var(--soft);color:var(--brand)}
+    .danger{background:#f9e8e8;color:var(--danger)}
+    .ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    .part{border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0;background:#fcfdfc}
+    .part-head{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .part-head input{font-weight:700;font-size:15px}
+    .material{display:grid;grid-template-columns:1.5fr .8fr .7fr 1fr .85fr auto;gap:7px;align-items:end;padding:8px 0;border-bottom:1px dashed var(--line)}
+    .material:last-child{border-bottom:0}
+    .material .cost{padding:10px 4px;font-weight:700;white-space:nowrap}
+    .resultbox{background:var(--soft);border-radius:12px;padding:10px;margin-top:10px}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .metric{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px}
+    .metric small{display:block;color:var(--muted);font-size:11px}
+    .metric strong{display:block;font-size:15px;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    th{color:var(--muted);font-size:11px}
+    .notice{background:var(--warning);border:1px solid #eadba8;border-radius:10px;padding:10px;font-size:12px;line-height:1.6}
+    .total{font-size:22px;font-weight:800;color:var(--brand)}
+    .muted{color:var(--muted);font-size:12px}
+    .footerbar{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;z-index:30}
+    .footerbar button{min-width:110px}
+    @media(max-width:760px){
+      .grid,.grid4,.metrics{grid-template-columns:1fr 1fr}
+      .material{grid-template-columns:1.4fr .8fr .7fr}
+      .material .basis,.material .cost,.material .remove{grid-column:auto}
+    }
+    @media(max-width:430px){
+      main{padding-left:8px;padding-right:8px}
+      section{padding:12px;border-radius:13px}
+      .grid,.grid4,.metrics{grid-template-columns:1fr 1fr}
+      .material{grid-template-columns:1.35fr .75fr .7fr}
+      .material .basis{grid-column:1/3}
+      .material .cost{grid-column:3}
+      .material .remove{grid-column:3}
+      th,td{padding:8px 4px;font-size:12px}
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>蒸留・ブレンド原価計算</h1>
+  <p>パーツごとに加水してからブレンドする計算方式</p>
+</header>
+
+<main>
+  <section>
+    <h2>1. 製品設定</h2>
+    <div class="grid4">
+      <label>製品アルコール度数（%）
+        <input id="targetAbv" type="number" min="0.1" max="99.9" step="0.1" value="45">
+      </label>
+      <label>製造ロス（%）
+        <input id="lossRate" type="number" min="0" max="99" step="0.1" value="0">
+      </label>
+      <label>加水用水の原価（円/L）
+        <input id="waterCost" type="number" min="0" step="0.01" value="0">
+      </label>
+      <label>商品名
+        <input id="productName" type="text" placeholder="例：YASO GIN">
+      </label>
+    </div>
+    <p class="muted">各パーツを上記の製品度数まで個別に加水した後、指定した割合でブレンドします。</p>
+  </section>
+
+  <section>
+    <div class="part-head">
+      <h2>2. 蒸留パーツ</h2>
+      <button type="button" class="primary" onclick="addPart()">＋ パーツ追加</button>
+    </div>
+    <div class="notice" style="margin-bottom:10px">ボタンが反応しない場合は、ChatGPT内プレビューではなくSafariまたはGitHub Pagesで開いてください。</div><div id="parts"></div>
+  </section>
+
+  <section>
+    <h2>3. ブレンド割合</h2>
+    <div class="notice">割合の合計が100%になるよう入力してください。各パーツの加水後量から、指定割合で作れる最大ブレンド量を自動計算します。</div>
+    <div id="blendTableWrap" style="margin-top:10px"></div>
+    <div id="blendSummary" class="resultbox"></div>
+  </section>
+
+  <section>
+    <h2>4. 容量別の1本原価</h2>
+    <p class="muted">資材費は、瓶・キャップ・ラベル・箱などを合計した1本あたりの金額を入力してください。</p>
+    <div id="bottleTable"></div>
+  </section>
+
+  <section>
+    <h2>計算メモ</h2>
+    <div class="notice">
+      蒸留後の加水量は「蒸留後量 × 蒸留度数 ÷ 製品度数 − 蒸留後量」で計算します。<br>
+      体積収縮や温度補正は含まない概算です。実製造では酒税管理・検定方法に合わせて調整してください。
+    </div>
+  </section>
+</main>
+
+<div class="footerbar">
+  <button type="button" class="primary" onclick="saveApp()">保存</button>
+  <button type="button" class="secondary" onclick="exportCsv()">CSV出力</button>
+  <button type="button" class="danger" onclick="resetApp()">初期化</button>
+</div>
+
+<script>
+const bottleSizes = [45,100,500,700];
+let state = {
+  targetAbv:45, lossRate:0, waterCost:0, productName:"",
+  parts:[],
+  packaging: {"45":0,"100":0,"500":0,"700":0}
+};
+
+const fmt = (n, d=2) => Number.isFinite(n) ? n.toLocaleString("ja-JP",{maximumFractionDigits:d}) : "0";
+const yen = n => "¥" + fmt(n,2);
+const uid = () => Math.random().toString(36).slice(2,9);
+
+function newMaterial(){
+  return {id:uid(), name:"", amount:0, unit:"kg", unitPrice:0, priceBasis:"kg"};
+}
+function newPart(){
+  return {id:uid(), name:"蒸留パーツ", outputL:0, abv:0, blendPct:0, materials:[newMaterial()]};
+}
+function ensurePart(){ if(!state.parts.length) state.parts.push(newPart()); }
+
+function baseAmount(m){
+  const a = Number(m.amount)||0;
+  if(m.unit==="kg") return {dimension:"mass", value:a};
+  if(m.unit==="g") return {dimension:"mass", value:a/1000};
+  if(m.unit==="L") return {dimension:"volume", value:a};
+  if(m.unit==="mL") return {dimension:"volume", value:a/1000};
+  return {dimension:"mass", value:0};
+}
+function materialCost(m){
+  const b = baseAmount(m);
+  const basisDim = m.priceBasis==="kg" ? "mass":"volume";
+  return b.dimension===basisDim ? b.value*(Number(m.unitPrice)||0) : 0;
+}
+function partCalc(p){
+  const rawCost = p.materials.reduce((s,m)=>s+materialCost(m),0);
+  const output = Number(p.outputL)||0;
+  const abv = Number(p.abv)||0;
+  const target = Number(state.targetAbv)||0;
+  const diluted = target>0 ? output*abv/target : 0;
+  const water = Math.max(0,diluted-output);
+  const totalCost = rawCost + water*(Number(state.waterCost)||0);
+  const costPerL = diluted>0 ? totalCost/diluted : 0;
+  return {rawCost, output, abv, diluted, water, totalCost, costPerL};
+}
+function blendCalc(){
+  const pcs = state.parts.map(p=>({p,c:partCalc(p),r:(Number(p.blendPct)||0)/100}));
+  const sumPct = pcs.reduce((s,x)=>s+x.r,0)*100;
+  const active = pcs.filter(x=>x.r>0 && x.c.diluted>=0);
+  let maxBlend = 0;
+  if(active.length && Math.abs(sumPct-100)<0.01){
+    maxBlend = Math.min(...active.map(x=>x.c.diluted/x.r));
+  }
+  const used = pcs.map(x=>{
+    const usedL = maxBlend*x.r;
+    const usedCost = usedL*x.c.costPerL;
+    return {...x,usedL,usedCost,remaining:Math.max(0,x.c.diluted-usedL)};
+  });
+  const totalCost = used.reduce((s,x)=>s+x.usedCost,0);
+  const loss = Math.max(0,Math.min(99,Number(state.lossRate)||0))/100;
+  const sellableL = maxBlend*(1-loss);
+  const costPerL = sellableL>0 ? totalCost/sellableL : 0;
+  return {sumPct,maxBlend,sellableL,totalCost,costPerL,used};
+}
+
+function render(){
+  document.getElementById("targetAbv").value=state.targetAbv;
+  document.getElementById("lossRate").value=state.lossRate;
+  document.getElementById("waterCost").value=state.waterCost;
+  document.getElementById("productName").value=state.productName;
+  renderParts(); renderBlend(); renderBottles();
+}
+
+function renderParts(){
+  const root=document.getElementById("parts"); root.innerHTML="";
+  state.parts.forEach((p,pi)=>{
+    const c=partCalc(p);
+    const el=document.createElement("div"); el.className="part";
+    el.innerHTML=`
+      <div class="part-head">
+        <input data-part="${p.id}" data-field="name" value="${escapeHtml(p.name)}" aria-label="パーツ名">
+        <button type="button" class="danger" onclick="removePart(\'${p.id}\')">削除</button>
+      </div>
+      <div class="grid4">
+        <label>蒸留後量（L）<input type="number" min="0" step="0.001" data-part="${p.id}" data-field="outputL" value="${p.outputL}"></label>
+        <label>蒸留後度数（%）<input type="number" min="0" max="99.9" step="0.1" data-part="${p.id}" data-field="abv" value="${p.abv}"></label>
+        <label>ブレンド割合（%）<input type="number" min="0" max="100" step="0.1" data-part="${p.id}" data-field="blendPct" value="${p.blendPct}"></label>
+        <label>原材料数<input value="${p.materials.length}" disabled></label>
+      </div>
+      <h3>使用原材料</h3>
+      <div class="materials"></div>
+      <div class="toolbar" style="margin-top:8px">
+        <button type="button" class="secondary" onclick="addMaterial(\'${p.id}\')">＋ 原材料追加</button>
+      </div>
+      <div class="resultbox">
+        <div class="metrics">
+          <div class="metric"><small>原材料費</small><strong>${yen(c.rawCost)}</strong></div>
+          <div class="metric"><small>加水量</small><strong>${fmt(c.water,3)} L</strong></div>
+          <div class="metric"><small>加水後量</small><strong>${fmt(c.diluted,3)} L</strong></div>
+          <div class="metric"><small>加水後原価</small><strong>${yen(c.costPerL)} /L</strong></div>
+        </div>
+      </div>`;
+    const mr=el.querySelector(".materials");
+    p.materials.forEach(m=>{
+      const mc=materialCost(m);
+      const mismatch=(baseAmount(m).dimension !== (m.priceBasis==="kg"?"mass":"volume"));
+      const row=document.createElement("div"); row.className="material";
+      row.innerHTML=`
+        <label>原材料名<input data-part="${p.id}" data-mat="${m.id}" data-mfield="name" value="${escapeHtml(m.name)}" placeholder="原酒、ジュニパーなど"></label>
+        <label>使用量<input type="number" min="0" step="0.001" data-part="${p.id}" data-mat="${m.id}" data-mfield="amount" value="${m.amount}"></label>
+        <label>単位<select data-part="${p.id}" data-mat="${m.id}" data-mfield="unit">
+          ${["kg","g","L","mL"].map(u=>`<option ${m.unit===u?"selected":""}>${u}</option>`).join("")}
+        </select></label>
+        <label>単価（円）<input type="number" min="0" step="0.01" data-part="${p.id}" data-mat="${m.id}" data-mfield="unitPrice" value="${m.unitPrice}"></label>
+        <label class="basis">単価基準<select data-part="${p.id}" data-mat="${m.id}" data-mfield="priceBasis">
+          <option value="kg" ${m.priceBasis==="kg"?"selected":""}>1kgあたり</option>
+          <option value="L" ${m.priceBasis==="L"?"selected":""}>1Lあたり</option>
+        </select></label>
+        <div class="cost" title="${mismatch?"単位と単価基準が一致していません":""}">${mismatch?"⚠️ ":""}${yen(mc)}</div>
+        <button type="button" class="danger remove" onclick="removeMaterial(\'${p.id}\',\'${m.id}\')">×</button>`;
+      mr.appendChild(row);
+    });
+    root.appendChild(el);
+  });
+}
+
+function renderBlend(){
+  const b=blendCalc();
+  const wrap=document.getElementById("blendTableWrap");
+  wrap.innerHTML=`<table>
+    <thead><tr><th>パーツ</th><th>割合</th><th>加水後量</th><th>使用量</th><th>残量</th><th>使用原価</th></tr></thead>
+    <tbody>${b.used.map(x=>`<tr><td>${escapeHtml(x.p.name)}</td><td>${fmt(x.r*100,1)}%</td><td>${fmt(x.c.diluted,3)}L</td><td>${fmt(x.usedL,3)}L</td><td>${fmt(x.remaining,3)}L</td><td>${yen(x.usedCost)}</td></tr>`).join("")}</tbody>
+  </table>`;
+  const ok=Math.abs(b.sumPct-100)<0.01;
+  document.getElementById("blendSummary").innerHTML=`
+    <div class="metrics">
+      <div class="metric"><small>割合合計</small><strong style="color:${ok?"inherit":"var(--danger)"}">${fmt(b.sumPct,1)}%</strong></div>
+      <div class="metric"><small>最大ブレンド量</small><strong>${fmt(b.maxBlend,3)} L</strong></div>
+      <div class="metric"><small>ロス控除後</small><strong>${fmt(b.sellableL,3)} L</strong></div>
+      <div class="metric"><small>ブレンド総原価</small><strong>${yen(b.totalCost)}</strong></div>
+    </div>
+    <p class="muted">${ok?"加水済みパーツの在庫量と割合から計算しています。":"割合合計を100%にしてください。"}</p>`;
+}
+
+function renderBottles(){
+  const b=blendCalc();
+  const rows=bottleSizes.map(size=>{
+    const count=Math.floor((b.sellableL*1000)/size);
+    const liquidCost=b.costPerL*(size/1000);
+    const pack=Number(state.packaging[String(size)])||0;
+    const total=liquidCost+pack;
+    return `<tr>
+      <td>${size}mL</td>
+      <td><input type="number" min="0" step="0.01" data-pack="${size}" value="${pack}" aria-label="${size}mL資材費"></td>
+      <td>${count.toLocaleString("ja-JP")}本</td>
+      <td>${yen(liquidCost)}</td>
+      <td><strong>${yen(total)}</strong></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("bottleTable").innerHTML=`<table>
+    <thead><tr><th>容量</th><th>資材費/本</th><th>製造可能本数</th><th>内容液原価/本</th><th>合計原価/本</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="targetAbv"||t.id==="lossRate"||t.id==="waterCost"||t.id==="productName"){
+    state[t.id]=t.type==="number" ? Number(t.value) : t.value; renderParts(); renderBlend(); renderBottles(); return;
+  }
+  if(t.dataset.part && t.dataset.field){
+    const p=state.parts.find(x=>x.id===t.dataset.part); if(!p)return;
+    p[t.dataset.field]=t.type==="number"?Number(t.value):t.value; renderParts(); renderBlend(); renderBottles(); return;
+  }
+  if(t.dataset.part && t.dataset.mat && t.dataset.mfield){
+    const p=state.parts.find(x=>x.id===t.dataset.part); const m=p ? p.materials.find(x=>x.id===t.dataset.mat) : null; if(!m)return;
+    m[t.dataset.mfield]=t.type==="number"?Number(t.value):t.value; renderParts(); renderBlend(); renderBottles(); return;
+  }
+  if(t.dataset.pack){ state.packaging[t.dataset.pack]=Number(t.value); renderBottles(); }
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.part && t.dataset.mat && t.dataset.mfield){
+    const p=state.parts.find(x=>x.id===t.dataset.part); const m=p ? p.materials.find(x=>x.id===t.dataset.mat) : null; if(!m)return;
+    m[t.dataset.mfield]=t.value; renderParts(); renderBlend(); renderBottles();
+  }
+});
+
+function addPart(){
+  state.parts.push(newPart());
+  render();
+  setTimeout(function(){
+    var parts=document.querySelectorAll(".part");
+    if(parts.length) parts[parts.length-1].scrollIntoView({behavior:"smooth",block:"start"});
+  },50);
+}
+function removePart(id){
+  state.parts=state.parts.filter(function(x){return x.id!==id;});
+  ensurePart();
+  render();
+}
+function addMaterial(partId){
+  var p=state.parts.find(function(x){return x.id===partId;});
+  if(p){p.materials.push(newMaterial());render();}
+}
+function removeMaterial(partId,matId){
+  var p=state.parts.find(function(x){return x.id===partId;});
+  if(p){
+    p.materials=p.materials.filter(function(x){return x.id!==matId;});
+    if(!p.materials.length)p.materials.push(newMaterial());
+    render();
+  }
+}
+function saveApp(){
+  try{
+    localStorage.setItem("distillationCostApp",JSON.stringify(state));
+    alert("この端末に保存しました。");
+  }catch(e){
+    alert("この開き方では保存できません。Safariで開くか、GitHub PagesのURLから使用してください。");
+  }
+}
+function resetApp(){
+  if(confirm("入力内容をすべて初期化しますか？")){
+    try{localStorage.removeItem("distillationCostApp");}catch(e){}
+    state={targetAbv:45,lossRate:0,waterCost:0,productName:"",parts:[newPart()],packaging:{"45":0,"100":0,"500":0,"700":0}};
+    render();
+  }
+}
+
+function exportCsv(){
+  const b=blendCalc();
+  const rows=[["商品名",state.productName],["製品度数",state.targetAbv+"%"],["ロス率",state.lossRate+"%"],[],["パーツ","加水後量L","割合%","使用量L","使用原価円"]];
+  b.used.forEach(x=>rows.push([x.p.name,x.c.diluted,x.r*100,x.usedL,x.usedCost]));
+  rows.push([],["最大ブレンド量L",b.maxBlend],["ロス控除後L",b.sellableL],["ブレンド総原価円",b.totalCost],[],["容量mL","製造可能本数","内容液原価/本","資材費/本","合計原価/本"]);
+  bottleSizes.forEach(size=>{
+    const count=Math.floor((b.sellableL*1000)/size);
+    const lc=b.costPerL*(size/1000), pc=Number(state.packaging[String(size)])||0;
+    rows.push([size,count,lc,pc,lc+pc]);
+  });
+  const csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url;a.download=(state.productName||"蒸留原価計算")+".csv";a.click();URL.revokeObjectURL(url);
+}
+
+try{
+  const saved=JSON.parse(localStorage.getItem("distillationCostApp"));
+  if(saved && saved.parts){state=saved;}
+}catch(e){}
+ensurePart(); render();
+</script>
+</body>
+</html>
